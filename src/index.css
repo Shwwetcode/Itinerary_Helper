@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-cream-100 text-espresso-700 antialiased font-sans flex flex-col min-h-screen selection:bg-terracotta-200/60;
+    /* Warm, relaxed cream gradient */
+    background-image:
+      radial-gradient(ellipse at top right, #F5EDE3 0%, transparent 50%),
+      radial-gradient(ellipse at bottom left, #EDE0D0 0%, transparent 50%),
+      linear-gradient(170deg, #FAF6F0 0%, #F5EDE3 40%, #EDE0D0 100%);
+    background-attachment: fixed;
+  }
+
+  /* Smooth scrollbar for the cream theme */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #FAF6F0;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #CCBA9E;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #B89C78;
+  }
+}
+
+@layer components {
+  .glass-card {
+    background: rgba(255, 253, 249, 0.75);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(200, 180, 160, 0.3);
+    box-shadow:
+      0 4px 24px rgba(60, 43, 31, 0.06),
+      0 1px 4px rgba(60, 43, 31, 0.04);
+  }
+
+  .glass-card:hover {
+    box-shadow:
+      0 8px 32px rgba(60, 43, 31, 0.1),
+      0 2px 8px rgba(60, 43, 31, 0.06);
+  }
+
+  .input-field {
+    @apply w-full bg-cream-50 border border-sandstone-300 rounded-xl px-4 py-3 text-espresso-700 placeholder-espresso-200 focus:outline-none focus:ring-2 focus:ring-terracotta-400/50 focus:border-terracotta-400 transition-all duration-200;
+  }
+
+  .input-field:hover {
+    @apply border-sandstone-400;
+  }
+
+  .btn-primary {
+    @apply w-full text-white font-semibold py-3.5 px-6 rounded-xl shadow-md hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none;
+    background: linear-gradient(135deg, #D4915A 0%, #C06B3E 50%, #A95A33 100%);
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, #E6A67A 0%, #D4915A 50%, #C06B3E 100%);
+    box-shadow: 0 8px 30px rgba(212, 145, 90, 0.35);
+  }
+
+  /* Traffic level indicator dots */
+  .traffic-low {
+    @apply bg-sage-400 text-sage-700;
+  }
+  .traffic-moderate {
+    @apply bg-yellow-400 text-yellow-800;
+  }
+  .traffic-heavy {
+    @apply bg-red-400 text-red-800;
+  }
+}

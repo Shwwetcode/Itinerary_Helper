@@ -136,12 +136,35 @@ For stops where traffic data isn't relevant (e.g. very short walks), you may sti
   };
 
   // ─── Model Fallback Chain ─────────────────────────────────────────────────────
-  // All verified via ListModels API — all work on v1beta with responseMimeType
+  // Ordered from newest/most-capable → oldest/most-permissive free tier.
+  // The engine tries each model in sequence; on quota (429) or model-not-found
+  // (404) errors it waits briefly then moves to the next one automatically.
   const models = [
-    'gemini-2.5-flash',         // newest, supports thinking
+    'gemini-2.5-flash',         // newest — high capability, generous quota
+    'gemini-2.5-pro',           // most capable 2.5
     'gemini-2.0-flash',         // fast & stable
-    'gemini-2.0-flash-lite',    // lightweight fallback
+    'gemini-2.0-flash-lite',    // lightweight 2.0
+    'gemini-1.5-flash',         // older but very generous free tier
+    'gemini-1.5-flash-8b',      // smallest/fastest 1.5 — highest RPM
+    'gemini-1.5-pro',           // 1.5 pro as last resort
   ];
+
+  /**
+   * Returns true if the HTTP status / error body indicates a quota or rate-limit
+   * issue (i.e., worth retrying with a different model).
+   */
+  const isRetryable = (status) =>
+    status === 429 || status === 404 || status === 503 || status === 500;
+
+  /**
+   * Extracts the retry-after seconds from response headers or body, capped at 5s
+   * so UX doesn't stall too long between model attempts.
+   */
+  const getRetryDelay = (resp) => {
+    const retryAfter = resp?.headers?.get('Retry-After');
+    const secs = retryAfter ? Math.min(parseFloat(retryAfter), 5) : 1;
+    return secs * 1000;
+  };
 
   const fetchWithModel = async (modelName) => {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
@@ -154,23 +177,47 @@ For stops where traffic data isn't relevant (e.g. very short walks), you may sti
 
   let response = null;
   let lastError = null;
+  let usedModel = null;
 
   for (const model of models) {
     try {
+      console.log(`[AI Engine] Trying model: ${model}`);
       response = await fetchWithModel(model);
-      if (response.ok) break;
-      // Don't retry on auth errors (401/403) — key is wrong, no point retrying
-      if (response.status === 401 || response.status === 403) break;
-      // Retry on 404 (model not found), 429 (rate limit), or 5xx (server errors)
-      lastError = `Model ${model} returned HTTP ${response.status}`;
+
+      if (response.ok) {
+        usedModel = model;
+        console.log(`[AI Engine] ✅ Success with model: ${model}`);
+        break;
+      }
+
+      // Auth errors: wrong key — no point trying other models
+      if (response.status === 401 || response.status === 403) {
+        console.warn(`[AI Engine] 🔑 Auth error on ${model}. Stopping.`);
+        break;
+      }
+
+      if (isRetryable(response.status)) {
+        const delay = getRetryDelay(response);
+        console.warn(`[AI Engine] ⚠️ ${model} returned ${response.status}. Retrying next model in ${delay}ms...`);
+        lastError = `${model}: HTTP ${response.status} (quota/rate-limit)`;
+        await new Promise((res) => setTimeout(res, delay));
+        response = null; // clear so fallback continues
+        continue;
+      }
+
+      // Any other non-retryable HTTP error — stop
+      lastError = `${model}: HTTP ${response.status}`;
+      break;
+
     } catch (networkErr) {
-      lastError = `Network error: ${networkErr.message}`;
+      lastError = `${model}: Network error — ${networkErr.message}`;
+      console.error(`[AI Engine] 🌐 Network error on ${model}:`, networkErr.message);
       response = null;
     }
   }
 
   if (!response || !response.ok) {
-    let message = lastError || 'Unknown API error';
+    let message = lastError || 'All Gemini models are currently unavailable. Please try again in a moment.';
     if (response) {
       try {
         const errData = await response.json();
@@ -178,8 +225,7 @@ For stops where traffic data isn't relevant (e.g. very short walks), you may sti
       } catch (_) {}
 
       if (response.status === 401 || response.status === 403) {
-        message =
-          'Invalid or expired API key. Please check your Gemini API key and try again.';
+        message = 'Invalid or expired API key. Please check your Gemini API key and try again.';
       }
     }
     throw new Error(message);
